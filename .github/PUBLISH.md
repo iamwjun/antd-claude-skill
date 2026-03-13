@@ -8,27 +8,35 @@
 - ✅ **自动发布到 npm** - 构建并发布到 npm registry
 - ✅ **自动创建 GitHub Release** - 包含 changelog
 - ✅ **Git Tag 管理** - 自动创建和推送版本标签
-- ✅ **使用 npm Trusted Publisher** - 无需配置 NPM_TOKEN，更安全
+- ✅ **使用 NPM Token** - 稳定可靠的发布方式
 
 ## ⚙️ 配置说明
 
-### npm Trusted Publisher 已配置 ✅
+### NPM Token 配置（当前使用）✅
 
-本项目已配置 **npm Trusted Publisher**，这意味着：
+本项目使用 **NPM Automation Token** 进行发布，这是最稳定可靠的方式。
 
-- ✅ **无需手动配置 NPM_TOKEN** - 使用 OpenID Connect (OIDC) 自动验证
-- ✅ **更高的安全性** - 避免 token 泄露风险
-- ✅ **自动 Provenance** - 发布包含来源证明
+#### 配置步骤
 
-### GitHub Actions 权限配置
+1. **生成 NPM Token**
+   - 登录 [npmjs.com](https://www.npmjs.com/)
+   - 头像 → Access Tokens → Generate New Token
+   - 选择 **Automation** 类型
+   - 复制生成的 token
 
-确保仓库 Actions 权限已正确配置：
+2. **配置 GitHub Secret**
+   - GitHub 仓库 → Settings → Secrets and variables → Actions
+   - New repository secret
+   - Name: `NPM_TOKEN`
+   - Value: 粘贴你的 token
+   - Add secret
 
-1. Settings → Actions → General
-2. Workflow permissions 选择 **"Read and write permissions"**
-3. 勾选 **"Allow GitHub Actions to create and approve pull requests"**
+3. **GitHub Actions 权限**
+   - Settings → Actions → General
+   - Workflow permissions: **"Read and write permissions"**
+   - 勾选 **"Allow GitHub Actions to create and approve pull requests"**
 
-> 💡 这些权限用于推送版本标签和创建 GitHub Release
+✅ **配置完成后即可自动发布！**
 
 ## 🚀 使用方式
 
@@ -132,7 +140,6 @@ chore: xxx          → patch (0.0.1)
 
 1. **npm 包** - 发布到 npm registry
    - 链接：`https://www.npmjs.com/package/antd-claude-skill`
-   - ✅ **包含 Provenance** - 可验证的来源证明
 
 2. **Git Tag** - 创建版本标签
    - 格式：`v0.1.2`
@@ -140,34 +147,11 @@ chore: xxx          → patch (0.0.1)
 3. **GitHub Release** - 创建发布记录
    - 包含版本号
    - 包含自动生成的 changelog
-   - 链接：`https://github.com/your-org/antd-claude-skill/releases`
+   - 链接：`https://github.com/iamwjun/antd-claude-skill/releases`
 
 4. **Workflow Summary** - 发布摘要
    - 显示版本信息
    - 显示相关链接
-
-## 🔐 关于 npm Trusted Publisher
-
-### 什么是 Trusted Publisher？
-
-npm Trusted Publisher 是一种基于 OpenID Connect (OIDC) 的身份验证机制，允许从 CI/CD 平台（如 GitHub Actions）直接发布包，无需手动管理 token。
-
-### 优势
-
-- ✅ **无需 token 管理** - 不需要创建和存储 NPM_TOKEN
-- ✅ **更高安全性** - 避免 token 泄露风险
-- ✅ **自动 Provenance** - 每个发布都包含可验证的来源证明
-- ✅ **审计追踪** - 清晰记录每次发布的来源
-
-### 如何验证 Provenance
-
-用户可以验证包的来源：
-
-```bash
-npm view antd-claude-skill
-```
-
-在输出中会看到 `provenance` 信息，显示包是从哪个 GitHub 仓库和 workflow 发布的。
 
 ## 📝 Changelog 生成规则
 
@@ -248,19 +232,20 @@ chore: release v0.1.2 [skip ci]
 
 **解决方案：**
 
-1. 确认 npm Trusted Publisher 配置正确
+1. 检查 NPM_TOKEN 是否有效
    - 登录 npm 官网
-   - 进入包设置 → Publishing Access
-   - 确认 GitHub Actions 已授权
+   - Access Tokens → 检查 token 状态
+   - 如果过期，重新生成并更新 GitHub Secret
 
-2. 检查 GitHub Actions 权限
-   - Settings → Actions → General
-   - Workflow permissions 应为 "Read and write permissions"
-   - 确保 `id-token: write` 权限已启用
+2. 确保 token 类型正确
+   - 必须是 **Automation** 类型的 token
+   - 不要使用 "Publish" 或 "Read" 类型
 
-3. 确保包名未被占用（首次发布）
+3. 检查 GitHub Secret 配置
+   - Secret 名称必须是 `NPM_TOKEN`（大小写敏感）
+   - Value 前后不要有空格
 
-4. 对于 scoped package（如 `@org/package`），确保有发布权限
+4. 确保包名未被占用（首次发布）
 
 ### 问题：Release 创建失败
 

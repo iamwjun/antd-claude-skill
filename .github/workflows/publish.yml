@@ -1,0 +1,134 @@
+name: Publish to NPM
+
+on:
+  push:
+    branches:
+      - master
+      - main
+  workflow_dispatch:
+    inputs:
+      version-type:
+        description: 'Version type to bump'
+        required: true
+        type: choice
+        options:
+          - patch
+          - minor
+          - major
+        default: 'patch'
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      packages: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Configure Git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Get current version
+        id: current-version
+        run: |
+          CURRENT_VERSION=$(node -p "require('./package.json').version")
+          echo "version=$CURRENT_VERSION" >> $GITHUB_OUTPUT
+          echo "Current version: $CURRENT_VERSION"
+
+      - name: Determine version bump type
+        id: version-bump
+        run: |
+          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+            BUMP_TYPE="${{ github.event.inputs.version-type }}"
+          else
+            # 从最近的 commit message 判断版本类型
+            COMMIT_MSG=$(git log -1 --pretty=%B)
+            if [[ $COMMIT_MSG =~ ^(feat!|fix!|BREAKING CHANGE) ]]; then
+              BUMP_TYPE="major"
+            elif [[ $COMMIT_MSG =~ ^feat ]]; then
+              BUMP_TYPE="minor"
+            else
+              BUMP_TYPE="patch"
+            fi
+          fi
+          echo "type=$BUMP_TYPE" >> $GITHUB_OUTPUT
+          echo "Version bump type: $BUMP_TYPE"
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Build
+        run: npm run build
+
+      - name: Bump version
+        id: bump-version
+        run: |
+          BUMP_TYPE="${{ steps.version-bump.outputs.type }}"
+          npm version $BUMP_TYPE -m "chore: release v%s [skip ci]"
+          NEW_VERSION=$(node -p "require('./package.json').version")
+          echo "version=$NEW_VERSION" >> $GITHUB_OUTPUT
+          echo "New version: $NEW_VERSION"
+
+      - name: Push version changes
+        run: |
+          git push origin ${{ github.ref_name }}
+          git push origin --tags
+
+      - name: Generate changelog
+        id: changelog
+        run: |
+          # 获取上一个 tag
+          PREV_TAG=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo "")
+
+          if [ -z "$PREV_TAG" ]; then
+            # 如果没有上一个 tag，获取所有 commits
+            CHANGELOG=$(git log --pretty=format:"- %s (%h)" --reverse)
+          else
+            # 获取两个 tag 之间的 commits
+            CHANGELOG=$(git log $PREV_TAG..HEAD --pretty=format:"- %s (%h)" --reverse)
+          fi
+
+          # 输出到文件以避免特殊字符问题
+          echo "$CHANGELOG" > changelog.txt
+          echo "Changelog generated"
+
+      - name: Publish to NPM
+        run: npm publish
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: v${{ steps.bump-version.outputs.version }}
+          name: Release v${{ steps.bump-version.outputs.version }}
+          body_path: changelog.txt
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Summary
+        run: |
+          echo "## 🎉 Release Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **Previous Version:** ${{ steps.current-version.outputs.version }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **New Version:** ${{ steps.bump-version.outputs.version }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Bump Type:** ${{ steps.version-bump.outputs.type }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **NPM Package:** https://www.npmjs.com/package/antd-claude-skill/v/${{ steps.bump-version.outputs.version }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **GitHub Release:** https://github.com/${{ github.repository }}/releases/tag/v${{ steps.bump-version.outputs.version }}" >> $GITHUB_STEP_SUMMARY
+

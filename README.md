@@ -144,6 +144,34 @@ add-skill
 node bin/cli.js
 ```
 
+## 📦 发布流程
+
+本项目支持自动发布到 npm 和创建 GitHub Release。
+
+### 自动发布（推荐）
+
+使用规范的 commit message，推送到 main/master 分支即可自动发布：
+
+```bash
+# Bug 修复 → patch 版本 (0.1.1 → 0.1.2)
+git commit -m "fix: resolve login issue"
+
+# 新功能 → minor 版本 (0.1.2 → 0.2.0)
+git commit -m "feat: add new component"
+
+# 破坏性变更 → major 版本 (0.2.0 → 1.0.0)
+git commit -m "feat!: redesign API"
+
+# 推送触发自动发布
+git push origin main
+```
+
+### 手动触发
+
+在 GitHub Actions 页面手动运行 workflow，选择版本类型（patch/minor/major）。
+
+详细说明请查看 [发布文档](./.github/PUBLISH.md)。
+
 ## 📝 文档
 
 - [Skill 说明](./skills/antd-claude-skill/skill.md)

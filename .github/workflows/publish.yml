@@ -23,6 +23,7 @@ jobs:
     permissions:
       contents: write
       packages: write
+      id-token: write  # Required for npm Trusted Publisher
 
     steps:
       - name: Checkout code
@@ -107,9 +108,7 @@ jobs:
           echo "Changelog generated"
 
       - name: Publish to NPM
-        run: npm publish
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: npm publish --provenance --access public
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v1

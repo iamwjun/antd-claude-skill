@@ -4,20 +4,21 @@
 
 ## 📁 文件说明
 
-- **workflows/publish.yml** - 自动发布 workflow
+- **workflows/publish.yml** - 自动发布 workflow（使用 npm Trusted Publisher）
 - **PUBLISH.md** - 详细发布配置和使用指南
 - **COMMIT_CONVENTION.md** - Commit message 规范
 
 ## 🚀 快速开始
 
-### 1. 配置 NPM Token
+### 1. 无需配置 Token ✅
 
-```bash
-# 1. 登录 npm 获取 Automation token
-# 2. GitHub Settings → Secrets → New secret
-# Name: NPM_TOKEN
-# Value: <your-npm-token>
-```
+本项目使用 **npm Trusted Publisher**，无需手动配置 NPM_TOKEN！
+
+只需确保 GitHub Actions 权限已启用：
+
+Settings → Actions → General → Workflow permissions:
+- ✅ "Read and write permissions"
+- ✅ "Allow GitHub Actions to create and approve pull requests"
 
 ### 2. 使用规范的 Commit Message
 
@@ -59,7 +60,7 @@ git push origin main
 
 每次发布会自动创建：
 
-- ✅ npm 包
+- ✅ npm 包（含 Provenance 来源证明）
 - ✅ Git tag (v0.1.2)
 - ✅ GitHub Release (含 changelog)
 

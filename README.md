@@ -127,7 +127,7 @@ npm install
 
 ```bash
 # 构建组件库
-npm run build2
+npm run build
 
 # 代码检查
 npm run lint

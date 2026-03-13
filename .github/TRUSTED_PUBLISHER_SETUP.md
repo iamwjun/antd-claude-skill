@@ -53,14 +53,15 @@ npm view antd-claude-skill
 | **Provider** | GitHub Actions | 选择 CI/CD 提供商 |
 | **GitHub repository owner** | `iamwjun` | 你的 GitHub 用户名或组织名 |
 | **GitHub repository name** | `antd-claude-skill` | 仓库名称（不含 owner） |
-| **Workflow file path** | `.github/workflows/publish.yml` | workflow 文件的完整路径 |
+| **Workflow file path** | `publish.yml` | workflow 文件名（不含路径） |
 
-**可选字段（推荐留空）：**
+⚠️ **重要提示：** Workflow 路径只需填写文件名 `publish.yml`，不要包含 `.github/workflows/` 前缀。
+
+**可选字段（推荐配置）：**
 
 | 字段 | 建议 | 原因 |
 |------|------|------|
 | **Environment** | 留空 | 除非使用 GitHub Environments，否则留空 |
-| **Branch** | 留空 | 允许从任何分支发布（已在 workflow 中限制） |
 
 #### 步骤 D: 保存配置
 
@@ -96,15 +97,15 @@ GitHub repository name: antd-claude-skill
 ### 3. Workflow 文件路径
 
 ```yaml
-# ❌ 错误
-publish.yml
+# ❌ 错误 - 包含完整路径
+.github/workflows/publish.yml
 workflows/publish.yml
 
-# ✅ 正确
-.github/workflows/publish.yml
+# ✅ 正确 - 只填文件名
+publish.yml
 ```
 
-必须包含完整的相对路径，从仓库根目录开始。
+只需填写 workflow 文件名，npm 会自动在 `.github/workflows/` 目录下查找。
 
 ### 4. 仓库可见性
 
@@ -238,9 +239,11 @@ Publishing Access
   └── Trusted publishers:
       └── GitHub Actions
           ├── Repository: iamwjun/antd-claude-skill
-          ├── Workflow: .github/workflows/publish.yml
-          └── Status: Active ✅
+          ├── Workflow: publish.yml
+          └── Status: public ✅
 ```
+
+✅ **Status 显示 "public" 表示配置成功！** 这表示该 Trusted Publisher 可以发布公开包。
 
 ### Workflow 配置示例
 

@@ -1,15 +1,21 @@
 {
   "name": "antd-claude-skill",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "An Ant Design Claude skill package",
   "main": "dist/index.js",
   "module": "dist/index.esm.js",
   "types": "dist/index.d.ts",
+  "bin": {
+    "add-skill": "./bin/cli.js"
+  },
   "files": [
-    "dist"
+    "dist",
+    "bin",
+    "skills"
   ],
   "scripts": {
     "build": "rollup -c",
+    "build:cli": "tsc bin/cli.ts --outDir bin --module commonjs --target es2015 --esModuleInterop",
     "dev": "rollup -c -w",
     "test": "jest",
     "lint": "eslint src --ext .ts,.tsx",
@@ -33,6 +39,7 @@
     "@rollup/plugin-commonjs": "^25.0.0",
     "@rollup/plugin-node-resolve": "^15.0.0",
     "@rollup/plugin-typescript": "^11.0.0",
+    "@types/node": "^20.0.0",
     "@types/react": "^18.0.0",
     "@types/react-dom": "^18.0.0",
     "@typescript-eslint/eslint-plugin": "^6.0.0",
@@ -43,5 +50,9 @@
     "tslib": "^2.6.0",
     "typescript": "^5.0.0"
   },
-  "dependencies": {}
+  "dependencies": {
+    "chalk": "^4.1.2",
+    "commander": "^11.0.0",
+    "inquirer": "^8.2.5"
+  }
 }

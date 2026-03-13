@@ -13,50 +13,42 @@ program
   .action(async () => {
     console.log(chalk.blue.bold('\n🚀 Ant Design Claude Skill Installer\n'));
 
-    // Find Claude skills directory
-    const possiblePaths = [
-      path.join(process.cwd(), '.claude', 'skills'),
-      path.join(process.env.HOME || process.env.USERPROFILE, '.claude', 'skills'),
-    ];
+    // Define possible paths
+    const possiblePaths = {
+      project: path.join(process.cwd(), '.claude', 'skills'),
+      global: path.join(process.env.HOME || process.env.USERPROFILE, '.claude', 'skills'),
+    };
+
+    // Always ask user for location preference
+    const { location } = await inquirer.prompt([
+      {
+        type: 'list',
+        name: 'location',
+        message: 'Where would you like to install the skill?',
+        choices: [
+          { name: 'Current project (./.claude/skills)', value: 'project' },
+          { name: 'Global Claude directory (~/.claude/skills)', value: 'global' },
+          { name: 'Custom location', value: 'custom' },
+        ],
+      },
+    ]);
 
     let targetDir = null;
 
-    // Check if skills directory exists
-    for (const dir of possiblePaths) {
-      if (fs.existsSync(dir)) {
-        targetDir = dir;
-        break;
-      }
-    }
-
-    // If no skills directory found, ask user
-    if (!targetDir) {
-      const { location } = await inquirer.prompt([
+    if (location === 'custom') {
+      // Ask for custom path
+      const { customPath } = await inquirer.prompt([
         {
-          type: 'list',
-          name: 'location',
-          message: 'Where would you like to install the skill?',
-          choices: [
-            { name: 'Current project (./.claude/skills)', value: possiblePaths[0] },
-            { name: 'Global Claude directory (~/.claude/skills)', value: possiblePaths[1] },
-            { name: 'Custom location', value: 'custom' },
-          ],
+          type: 'input',
+          name: 'customPath',
+          message: 'Enter the custom path:',
+          validate: (input) => input.trim() !== '' || 'Path cannot be empty',
         },
       ]);
-
-      if (location === 'custom') {
-        const { customPath } = await inquirer.prompt([
-          {
-            type: 'input',
-            name: 'customPath',
-            message: 'Enter the custom path:',
-            validate: (input) => input.trim() !== '' || 'Path cannot be empty',
-          },
-        ]);
-        targetDir = path.resolve(customPath);
-      } else {
-        targetDir = location;
-      }
+      targetDir = path.resolve(customPath);
+    } else {
+      // Use predefined path
+      targetDir = possiblePaths[location];
     }
 
     const skillTargetDir = path.join(targetDir, 'pro-components-page');
@@ -78,9 +70,15 @@ program
       }
     }
 
-    // Create target directory
+    // Create target directory and install
     try {
-      fs.mkdirSync(targetDir, { recursive: true });
+      // Create parent directory if it doesn't exist
+      if (!fs.existsSync(targetDir)) {
+        console.log(chalk.gray(`Creating directory: ${targetDir}`));
+        fs.mkdirSync(targetDir, { recursive: true });
+      }
+
+      // Create skill directory
       fs.mkdirSync(skillTargetDir, { recursive: true });
 
       // Get source directory
@@ -93,6 +91,7 @@ program
       }
 
       // Copy skill files
+      console.log(chalk.gray('\nCopying files...'));
       copyDirectory(sourceDir, skillTargetDir);
 
       console.log(chalk.green('\n✅ Skill installed successfully!\n'));

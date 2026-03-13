@@ -109,7 +109,7 @@ antd-claude-skill/
 │       └── examples/      # 示例代码
 ├── package.json
 ├── tsconfig.json
-├── rollup.config.js
+├── rollup.config.mjs
 └── README.md
 ```
 

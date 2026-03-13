@@ -23,7 +23,7 @@ jobs:
     permissions:
       contents: write
       packages: write
-      id-token: write  # Required for npm Trusted Publisher
+      # id-token: write  # Temporarily disabled for traditional token auth
 
     steps:
       - name: Checkout code
@@ -103,7 +103,9 @@ jobs:
           echo "Changelog generated"
 
       - name: Publish to NPM
-        run: npm publish --provenance --access public
+        run: npm publish --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
       - name: Commit and push version changes
         run: |

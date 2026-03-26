@@ -83,7 +83,7 @@ program
 
       // Get source directory
       const packageDir = path.join(__dirname, '..');
-      const sourceDir = path.join(packageDir, 'skills', 'antd-claude-skill');
+      const sourceDir = path.join(packageDir, 'skills', 'pro-components-page');
 
       if (!fs.existsSync(sourceDir)) {
         console.log(chalk.red('\n❌ Error: Skill source files not found.\n'));

@@ -1,7 +1,7 @@
 {
   "name": "antd-claude-skill",
   "version": "0.1.8",
-  "description": "An Ant Design Claude skill package",
+  "description": "Claude Code skill for Ant Design Pro Components - Generate ProTable, ProForm, ProDescriptions pages with best practices",
   "main": "dist/index.js",
   "module": "dist/index.esm.js",
   "types": "dist/index.d.ts",
@@ -23,11 +23,21 @@
     "prepublishOnly": "npm run build"
   },
   "keywords": [
-    "antd",
     "claude",
-    "skill",
+    "claude-code",
+    "claude-skill",
+    "agent-skill",
+    "antd",
+    "ant-design",
+    "pro-components",
     "react",
-    "ui"
+    "typescript",
+    "code-generator",
+    "scaffold",
+    "template",
+    "admin",
+    "crud",
+    "umijs"
   ],
   "author": "iamwjun",
   "license": "MIT",

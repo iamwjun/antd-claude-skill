@@ -6,6 +6,7 @@ export default defineConfig({
   model: {},
   initialState: {},
   request: {},
+  reactQuery: {},
   layout: {
     title: '@umijs/max',
   },
@@ -29,7 +30,36 @@ export default defineConfig({
       path: '/table',
       component: './Table',
     },
+    {
+      name: '产品管理',
+      path: '/demo',
+      routes: [
+        {
+          path: '/demo',
+          component: './demo',
+        },
+        {
+          name: '新建产品',
+          path: '/demo/create',
+          component: './demo/form',
+          hideInMenu: true,
+        },
+        {
+          name: '产品详情',
+          path: '/demo/:id',
+          component: './demo/detail',
+          hideInMenu: true,
+        },
+        {
+          name: '编辑产品',
+          path: '/demo/:id/edit',
+          component: './demo/form',
+          hideInMenu: true,
+        },
+      ],
+    },
   ],
+  mock: {},
   npmClient: 'pnpm',
 });
 

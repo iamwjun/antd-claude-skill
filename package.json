@@ -28,8 +28,16 @@
     "react",
     "ui"
   ],
-  "author": "",
+  "author": "iamwjun",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/iamwjun/antd-claude-skill.git"
+  },
+  "bugs": {
+    "url": "https://github.com/iamwjun/antd-claude-skill/issues"
+  },
+  "homepage": "https://github.com/iamwjun/antd-claude-skill#readme",
   "peerDependencies": {
     "react": ">=16.9.0",
     "react-dom": ">=16.9.0",

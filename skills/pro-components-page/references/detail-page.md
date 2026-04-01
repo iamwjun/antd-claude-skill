@@ -8,214 +8,174 @@
 
 ### `types.ts`
 ```tsx
-import { z } from 'zod'
+import { z } from 'zod';
 
 // 路由参数
 export const routeParamsSchema = z.object({
   id: z.string().min(1, 'id 不能为空'),
-})
-export type RouteParams = z.infer<typeof routeParamsSchema>
+});
+export type RouteParams = z.infer<typeof routeParamsSchema>;
 
 // 详情数据
-export const resourceDetailSchema = z.object({
+export const productDetailSchema = z.object({
   id: z.string(),
   name: z.string(),
   description: z.string().optional(),
-  status: z.enum(['active', 'inactive']),
+  price: z.number(),
+  originalPrice: z.number().optional(),
+  stock: z.number(),
   category: z.string(),
-  amount: z.number().optional(),
+  brand: z.string(),
+  status: z.enum(['on_sale', 'off_sale']),
+  imageUrl: z.string().optional(),
   tags: z.array(z.string()).default([]),
-  startDate: z.string().optional(),
-  endDate: z.string().optional(),
-  createdBy: z.string(),
+  salesCount: z.number().default(0),
+  rating: z.number().min(0).max(5).default(0),
   createdAt: z.string(),
   updatedAt: z.string(),
-})
-export type ResourceDetail = z.infer<typeof resourceDetailSchema>
-
-// 操作日志（示例关联数据）
-export const operationLogSchema = z.object({
-  id: z.string(),
-  action: z.string(),
-  operator: z.string(),
-  operatedAt: z.string(),
-  remark: z.string().optional(),
-})
-export type OperationLog = z.infer<typeof operationLogSchema>
+});
+export type ProductDetail = z.infer<typeof productDetailSchema>;
 ```
 
-### `api.ts`
+### `detail.tsx` - 使用 useQuery 获取详情
 ```tsx
-import type { ResourceDetail, OperationLog } from './types'
+import React from 'react';
+import { useParams, useNavigate, history, useQuery } from '@umijs/max';
+import { PageContainer, ProDescriptions } from '@ant-design/pro-components';
+import type { ProDescriptionsItemProps } from '@ant-design/pro-components';
+import { Button, Card, Popconfirm, Space, Spin, Tag, Typography, message, Image } from 'antd';
+import { EditOutlined, DeleteOutlined, ArrowLeftOutlined } from '@ant-design/icons';
+import styled from 'styled-components';
 
-export async function fetchResourceDetail(id: string): Promise<ResourceDetail> {
-  const res = await fetch(`/api/resources/${id}`)
-  if (!res.ok) throw new Error(`获取详情失败: ${res.status}`)
-  return res.json()
-}
+import { routeParamsSchema } from './types';
+import type { ProductDetail } from './types';
 
-export async function fetchOperationLogs(id: string): Promise<OperationLog[]> {
-  const res = await fetch(`/api/resources/${id}/logs`)
-  if (!res.ok) throw new Error(`获取日志失败: ${res.status}`)
-  return res.json()
-}
-
-export async function deleteResource(id: string): Promise<void> {
-  const res = await fetch(`/api/resources/${id}`, { method: 'DELETE' })
-  if (!res.ok) throw new Error(`删除失败: ${res.status}`)
-}
-```
-
-### `index.tsx`
-```tsx
-import React from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
-import {
-  PageContainer,
-  ProDescriptions,
-  ProTable,
-} from '@ant-design/pro-components'
-import type { ProDescriptionsItemProps, ProColumns } from '@ant-design/pro-components'
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Button, Card, Popconfirm, Space, Spin, Tag, Typography, message } from 'antd'
-import { EditOutlined, DeleteOutlined, ArrowLeftOutlined } from '@ant-design/icons'
-import styled from 'styled-components'
-import dayjs from 'dayjs'
-
-import { routeParamsSchema } from './types'
-import type { ResourceDetail, OperationLog } from './types'
-import { fetchResourceDetail, fetchOperationLogs, deleteResource } from './api'
-
-const { Text } = Typography
+const { Text } = Typography;
 
 // ==================== 样式 ====================
 const DetailWrapper = styled.div`
   display: flex;
   flex-direction: column;
   gap: 16px;
-`
+`;
 
 const DetailCard = styled(Card)`
   .ant-descriptions-item-label {
     color: rgba(0, 0, 0, 0.45);
-    width: 120px;
+    width: 140px;
   }
 
   .ant-descriptions-item-content {
     color: rgba(0, 0, 0, 0.85);
   }
-`
-
-const LogCard = styled(Card)`
-  .ant-pro-table-search {
-    display: none; /* 日志表格不需要搜索栏 */
-  }
-`
+`;
 
 const StatusTag = styled(Tag)<{ $status: string }>`
   border-radius: 10px;
-  padding: 0 10px;
-  font-size: 12px;
+  padding: 2px 12px;
+  font-size: 13px;
   border: none;
-  background-color: ${({ $status }) =>
-    $status === 'active' ? '#f6ffed' : '#f5f5f5'};
-  color: ${({ $status }) =>
-    $status === 'active' ? '#52c41a' : '#8c8c8c'};
-`
+  background-color: ${({ $status }) => ($status === 'on_sale' ? '#f6ffed' : '#f5f5f5')};
+  color: ${({ $status }) => ($status === 'on_sale' ? '#52c41a' : '#8c8c8c')};
+`;
 
-// ==================== 操作日志列定义 ====================
-const logColumns: ProColumns<OperationLog>[] = [
-  {
-    title: '操作',
-    dataIndex: 'action',
-    width: 120,
-  },
-  {
-    title: '操作人',
-    dataIndex: 'operator',
-    width: 100,
-  },
-  {
-    title: '备注',
-    dataIndex: 'remark',
-    ellipsis: true,
-    render: (_, record) => record.remark || <Text type="secondary">-</Text>,
-  },
-  {
-    title: '操作时间',
-    dataIndex: 'operatedAt',
-    width: 180,
-    render: (_, record) => dayjs(record.operatedAt).format('YYYY-MM-DD HH:mm:ss'),
-  },
-]
+const PriceText = styled.div`
+  .current-price {
+    color: #ff4d4f;
+    font-size: 24px;
+    font-weight: 600;
+  }
+
+  .original-price {
+    text-decoration: line-through;
+    color: #999;
+    font-size: 14px;
+    margin-left: 12px;
+  }
+`;
+
+// ==================== API 请求函数 ====================
+async function fetchProductDetail(id: string): Promise<ProductDetail> {
+  const res = await fetch(`/api/products/${id}`);
+  if (!res.ok) throw new Error(`获取详情失败: ${res.status}`);
+  const data = await res.json();
+  if (!data.success) throw new Error(data.message || '获取详情失败');
+  return data.data;
+}
+
+async function deleteProduct(id: string): Promise<void> {
+  const res = await fetch(`/api/products/${id}`, { method: 'DELETE' });
+  if (!res.ok) throw new Error(`删除失败: ${res.status}`);
+}
 
 // ==================== 主组件 ====================
-const ResourceDetailPage: React.FC = () => {
-  const rawParams = useParams()
-  const navigate = useNavigate()
-  const queryClient = useQueryClient()
+const ProductDetailPage: React.FC = () => {
+  const rawParams = useParams();
+  const navigate = useNavigate();
 
   // 解析路由参数
-  const parseResult = routeParamsSchema.safeParse(rawParams)
-  if (!parseResult.success) {
-    return <div>参数错误：缺少资源 ID</div>
+  const parseResult = routeParamsSchema.safeParse(rawParams);
+  if (!parseResult.success || !rawParams.id) {
+    return <div>参数错误：缺少产品 ID</div>;
   }
-  const { id } = parseResult.data
+  const { id } = parseResult.data;
+  const productId = id || rawParams.id;
 
-  // 获取详情
+  // 使用 useQuery 获取详情
   const {
     data: detail,
     isLoading,
     error,
   } = useQuery({
-    queryKey: ['resource', 'detail', id],
-    queryFn: () => fetchResourceDetail(id),
-    staleTime: 60 * 1000,
-    retry: 1,
-  })
+    queryKey: ['product', 'detail', productId],
+    queryFn: () => fetchProductDetail(productId!),
+    enabled: !!productId,
+  });
 
-  // 获取操作日志（并行请求）
-  const { data: logs = [], isLoading: isLogsLoading } = useQuery({
-    queryKey: ['resource', 'logs', id],
-    queryFn: () => fetchOperationLogs(id),
-    staleTime: 30 * 1000,
-  })
+  // 错误提示
+  React.useEffect(() => {
+    if (error) {
+      message.error((error as Error).message || '加载失败');
+    }
+  }, [error]);
 
   // 删除操作
-  const { mutate: handleDelete, isPending: isDeleting } = useMutation({
-    mutationFn: () => deleteResource(id),
-    onSuccess: () => {
-      message.success('删除成功')
-      queryClient.invalidateQueries({ queryKey: ['resource'] })
-      navigate('/resources')
-    },
-    onError: (err: Error) => {
-      message.error(err.message || '删除失败')
-    },
-  })
+  const [isDeleting, setIsDeleting] = React.useState(false);
+  const handleDelete = async () => {
+    setIsDeleting(true);
+    try {
+      await deleteProduct(productId!);
+      message.success('删除成功');
+      history.push('/products');
+    } catch (err: any) {
+      message.error(err.message || '删除失败');
+    } finally {
+      setIsDeleting(false);
+    }
+  };
 
   if (isLoading) {
     return (
-      <PageContainer title="资源详情">
+      <PageContainer title="产品详情">
         <Spin size="large" style={{ display: 'flex', justifyContent: 'center', padding: 80 }} />
       </PageContainer>
-    )
+    );
   }
 
   if (error || !detail) {
     return (
-      <PageContainer title="资源详情">
+      <PageContainer title="产品详情">
         <Card>
           <Text type="danger">加载失败，请刷新重试</Text>
         </Card>
       </PageContainer>
-    )
+    );
   }
 
   // ProDescriptions 列定义
-  const descriptionItems: ProDescriptionsItemProps<ResourceDetail>[] = [
+  const descriptionItems: ProDescriptionsItemProps<ProductDetail>[] = [
     {
-      title: '资源名称',
+      title: '产品名称',
       dataIndex: 'name',
       span: 2,
     },
@@ -224,53 +184,99 @@ const ResourceDetailPage: React.FC = () => {
       dataIndex: 'status',
       render: () => (
         <StatusTag $status={detail.status}>
-          {detail.status === 'active' ? '启用' : '停用'}
+          {detail.status === 'on_sale' ? '在售' : '下架'}
         </StatusTag>
       ),
     },
     {
-      title: '分类',
-      dataIndex: 'category',
+      title: '产品图片',
+      dataIndex: 'imageUrl',
+      span: 3,
+      render: () =>
+        detail.imageUrl ? (
+          <Image src={detail.imageUrl} alt={detail.name} width={200} style={{ borderRadius: 8 }} />
+        ) : (
+          <Text type="secondary">暂无图片</Text>
+        ),
     },
     {
-      title: '描述',
+      title: '品牌',
+      dataIndex: 'brand',
+    },
+    {
+      title: '分类',
+      dataIndex: 'category',
+      render: () => {
+        const categoryMap: Record<string, string> = {
+          electronics: '电子产品',
+          clothing: '服装',
+          food: '食品',
+          books: '图书',
+          sports: '运动',
+        };
+        return categoryMap[detail.category] || detail.category;
+      },
+    },
+    {
+      title: '产品描述',
       dataIndex: 'description',
       span: 3,
       render: () => detail.description || <Text type="secondary">暂无描述</Text>,
     },
     {
-      title: '金额',
-      dataIndex: 'amount',
-      render: () =>
-        detail.amount != null ? (
-          <Text strong style={{ color: '#f5222d' }}>
-            ¥{detail.amount.toFixed(2)}
-          </Text>
-        ) : (
-          <Text type="secondary">-</Text>
-        ),
+      title: '售价',
+      dataIndex: 'price',
+      render: () => (
+        <PriceText>
+          <span className="current-price">¥{detail.price.toFixed(2)}</span>
+          {detail.originalPrice && detail.originalPrice > detail.price && (
+            <span className="original-price">¥{detail.originalPrice.toFixed(2)}</span>
+          )}
+        </PriceText>
+      ),
     },
     {
-      title: '标签',
-      dataIndex: 'tags',
+      title: '库存',
+      dataIndex: 'stock',
       render: () => (
-        <Space wrap size={4}>
-          {detail.tags.length > 0
-            ? detail.tags.map((tag) => <Tag key={tag}>{tag}</Tag>)
-            : <Text type="secondary">-</Text>}
+        <Text style={{ color: detail.stock < 10 ? '#ff4d4f' : undefined }}>
+          {detail.stock} 件
+          {detail.stock < 10 && <Text type="danger"> （库存不足）</Text>}
+        </Text>
+      ),
+    },
+    {
+      title: '销量',
+      dataIndex: 'salesCount',
+      render: () => `${detail.salesCount} 件`,
+    },
+    {
+      title: '评分',
+      dataIndex: 'rating',
+      render: () => (
+        <Space>
+          <Text strong>{detail.rating.toFixed(1)}</Text>
+          <Text type="secondary">/ 5.0</Text>
         </Space>
       ),
     },
     {
-      title: '有效期',
-      render: () =>
-        detail.startDate && detail.endDate
-          ? `${detail.startDate} 至 ${detail.endDate}`
-          : <Text type="secondary">-</Text>,
-    },
-    {
-      title: '创建人',
-      dataIndex: 'createdBy',
+      title: '标签',
+      dataIndex: 'tags',
+      span: 2,
+      render: () => (
+        <Space wrap size={4}>
+          {detail.tags && detail.tags.length > 0 ? (
+            detail.tags.map((tag) => (
+              <Tag key={tag} color="blue">
+                {tag}
+              </Tag>
+            ))
+          ) : (
+            <Text type="secondary">暂无标签</Text>
+          )}
+        </Space>
+      ),
     },
     {
       title: '创建时间',
@@ -282,34 +288,34 @@ const ResourceDetailPage: React.FC = () => {
       dataIndex: 'updatedAt',
       valueType: 'dateTime',
     },
-  ]
+  ];
 
   return (
     <PageContainer
-      title="资源详情"
+      title="产品详情"
       breadcrumb={{
         items: [
           { title: '首页', path: '/' },
-          { title: '资源管理', path: '/resources' },
+          { title: '产品管理', path: '/products' },
           { title: detail.name },
         ],
       }}
       extra={
         <Space>
-          <Button icon={<ArrowLeftOutlined />} onClick={() => navigate(-1)}>
+          <Button icon={<ArrowLeftOutlined />} onClick={() => history.back()}>
             返回
           </Button>
           <Button
             type="primary"
             icon={<EditOutlined />}
-            onClick={() => navigate(`/resources/${id}/edit`)}
+            onClick={() => navigate(`/products/${productId}/edit`)}
           >
             编辑
           </Button>
           <Popconfirm
             title="确认删除？"
             description="删除后数据不可恢复，请谨慎操作"
-            onConfirm={() => handleDelete()}
+            onConfirm={handleDelete}
             okText="确认删除"
             okButtonProps={{ danger: true }}
             cancelText="取消"
@@ -323,34 +329,20 @@ const ResourceDetailPage: React.FC = () => {
     >
       <DetailWrapper>
         {/* 基本信息 */}
-        <DetailCard title="基本信息" bordered={false}>
-          <ProDescriptions<ResourceDetail>
+        <DetailCard title="产品信息" bordered={false}>
+          <ProDescriptions<ProductDetail>
             dataSource={detail}
             columns={descriptionItems}
             column={3}
             bordered
           />
         </DetailCard>
-
-        {/* 操作日志 */}
-        <LogCard title="操作记录" bordered={false}>
-          <ProTable<OperationLog>
-            rowKey="id"
-            columns={logColumns}
-            dataSource={logs}
-            loading={isLogsLoading}
-            pagination={{ pageSize: 10, showSizeChanger: false }}
-            search={false}
-            options={false}
-            toolBarRender={false}
-          />
-        </LogCard>
       </DetailWrapper>
     </PageContainer>
-  )
-}
+  );
+};
 
-export default ResourceDetailPage
+export default ProductDetailPage;
 ```
 
 ---
@@ -366,16 +358,25 @@ export default ResourceDetailPage
 | `render` | 自定义渲染，覆盖 valueType |
 | `dataSource` | 直接传入数据对象 |
 
-## 详情页并行请求模式
-
-详情页通常需要加载多个关联数据，使用多个 `useQuery` 并行发起：
+## 使用 useQuery 的优势
 
 ```tsx
-// 这两个请求会并行发出，不会串行等待
-const { data: detail } = useQuery({ queryKey: ['detail', id], ... })
-const { data: logs } = useQuery({ queryKey: ['logs', id], ... })
-const { data: related } = useQuery({ queryKey: ['related', id], ... })
+const {
+  data: detail,
+  isLoading,
+  error,
+} = useQuery({
+  queryKey: ['product', 'detail', id],
+  queryFn: () => fetchProductDetail(id!),
+  enabled: !!id,
+});
 ```
+
+优势：
+1. **自动缓存** - 相同 queryKey 会复用缓存
+2. **自动重试** - 请求失败自动重试
+3. **状态管理** - loading、error 自动管理
+4. **刷新机制** - 窗口聚焦时自动刷新
 
 ## 错误与加载状态处理
 
@@ -386,5 +387,18 @@ if (isLoading) return <PageContainer><Spin /></PageContainer>
 // 主数据加载失败 → 错误提示
 if (error || !detail) return <PageContainer><ErrorCard /></PageContainer>
 
-// 关联数据（日志等）加载中 → 局部 loading，不影响主内容显示
+// 错误提示
+React.useEffect(() => {
+  if (error) {
+    message.error((error as Error).message || '加载失败');
+  }
+}, [error]);
 ```
+
+## 最佳实践
+
+1. **使用 useQuery** - 替代 useState + useEffect
+2. **参数校验** - 使用 Zod 校验路由参数
+3. **错误处理** - 显示友好的错误提示
+4. **自定义渲染** - 使用 render 自定义复杂字段展示
+5. **样式隔离** - 使用 styled-components 定义组件样式

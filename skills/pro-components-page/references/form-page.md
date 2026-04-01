@@ -8,95 +8,62 @@
 
 ### `types.ts`
 ```tsx
-import { z } from 'zod'
+import { z } from 'zod';
 
 // 路由参数（编辑时有 id）
 export const routeParamsSchema = z.object({
   id: z.string().optional(),
-})
-export type RouteParams = z.infer<typeof routeParamsSchema>
+});
+export type RouteParams = z.infer<typeof routeParamsSchema>;
 
-// 表单数据 schema（同时用于前端校验和类型推导）
-export const resourceFormSchema = z.object({
-  name: z.string().min(1, '名称不能为空').max(50, '名称不超过50字'),
-  description: z.string().max(500, '描述不超过500字').optional(),
-  status: z.enum(['active', 'inactive']).default('active'),
+// 表单数据 schema
+export const productFormSchema = z.object({
+  name: z.string().min(1, '产品名称不能为空').max(100, '名称不超过100字'),
+  description: z.string().max(1000, '描述不超过1000字').optional(),
+  price: z.coerce.number().min(0.01, '价格必须大于0'),
+  originalPrice: z.coerce.number().min(0).optional(),
+  stock: z.coerce.number().int().min(0, '库存不能为负'),
   category: z.string().min(1, '请选择分类'),
+  brand: z.string().min(1, '请输入品牌'),
+  status: z.enum(['on_sale', 'off_sale']).default('on_sale'),
+  imageUrl: z.string().url('请输入有效的图片URL').optional(),
   tags: z.array(z.string()).optional().default([]),
-  startDate: z.string().optional(),
-  endDate: z.string().optional(),
-  amount: z.coerce.number().min(0, '金额不能为负').optional(),
-})
-export type ResourceFormValues = z.infer<typeof resourceFormSchema>
+});
+export type ProductFormValues = z.infer<typeof productFormSchema>;
 
 // 详情响应（用于编辑时回填）
-export const resourceDetailSchema = resourceFormSchema.extend({
+export const productDetailSchema = productFormSchema.extend({
   id: z.string(),
+  salesCount: z.number().default(0),
+  rating: z.number().min(0).max(5).default(0),
   createdAt: z.string(),
   updatedAt: z.string(),
-})
-export type ResourceDetail = z.infer<typeof resourceDetailSchema>
+});
+export type ProductDetail = z.infer<typeof productDetailSchema>;
 ```
 
-### `api.ts`
+### `form.tsx` - 使用 useQuery 获取详情
 ```tsx
-import type { ResourceFormValues, ResourceDetail } from './types'
-
-export async function fetchResourceDetail(id: string): Promise<ResourceDetail> {
-  const res = await fetch(`/api/resources/${id}`)
-  if (!res.ok) throw new Error(`获取详情失败: ${res.status}`)
-  return res.json()
-}
-
-export async function createResource(data: ResourceFormValues): Promise<ResourceDetail> {
-  const res = await fetch('/api/resources', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(data),
-  })
-  if (!res.ok) throw new Error(`创建失败: ${res.status}`)
-  return res.json()
-}
-
-export async function updateResource(
-  id: string,
-  data: ResourceFormValues
-): Promise<ResourceDetail> {
-  const res = await fetch(`/api/resources/${id}`, {
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(data),
-  })
-  if (!res.ok) throw new Error(`更新失败: ${res.status}`)
-  return res.json()
-}
-```
-
-### `index.tsx`
-```tsx
-import React from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
+import React from 'react';
+import { useParams, history, useQuery } from '@umijs/max';
 import {
   PageContainer,
   ProForm,
   ProFormText,
   ProFormTextArea,
   ProFormSelect,
-  ProFormDateRangePicker,
   ProFormDigit,
-  ProFormCheckbox,
-} from '@ant-design/pro-components'
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Card, Spin, message, Space, Button } from 'antd'
-import styled from 'styled-components'
+  ProFormRadio,
+} from '@ant-design/pro-components';
+import { Card, Spin, message, Button } from 'antd';
+import styled from 'styled-components';
 
-import { routeParamsSchema, resourceFormSchema } from './types'
-import type { ResourceFormValues } from './types'
-import { fetchResourceDetail, createResource, updateResource } from './api'
+import { routeParamsSchema, productFormSchema } from './types';
+import type { ProductFormValues, ProductDetail } from './types';
 
 // ==================== 样式 ====================
 const FormCard = styled(Card)`
-  max-width: 800px;
+  max-width: 900px;
   margin: 0 auto;
 
   .ant-card-body {
@@ -106,8 +73,9 @@ const FormCard = styled(Card)`
   .ant-pro-form-group-title {
     font-weight: 600;
     color: rgba(0, 0, 0, 0.85);
+    margin-bottom: 16px;
   }
-`
+`;
 
 const FooterBar = styled.div`
   display: flex;
@@ -116,85 +84,112 @@ const FooterBar = styled.div`
   padding-top: 24px;
   border-top: 1px solid #f0f0f0;
   margin-top: 24px;
-`
+`;
+
+// ==================== API 请求函数 ====================
+async function fetchProductDetail(id: string): Promise<ProductDetail> {
+  const res = await fetch(`/api/products/${id}`);
+  if (!res.ok) throw new Error(`获取详情失败: ${res.status}`);
+  const data = await res.json();
+  if (!data.success) throw new Error(data.message || '获取详情失败');
+  return data.data;
+}
+
+async function createProduct(data: ProductFormValues): Promise<ProductDetail> {
+  const res = await fetch('/api/products', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) throw new Error(`创建失败: ${res.status}`);
+  const result = await res.json();
+  if (!result.success) throw new Error(result.message || '创建失败');
+  return result.data;
+}
+
+async function updateProduct(id: string, data: ProductFormValues): Promise<ProductDetail> {
+  const res = await fetch(`/api/products/${id}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) throw new Error(`更新失败: ${res.status}`);
+  const result = await res.json();
+  if (!result.success) throw new Error(result.message || '更新失败');
+  return result.data;
+}
 
 // ==================== 主组件 ====================
-const ResourceFormPage: React.FC = () => {
-  const rawParams = useParams()
-  const navigate = useNavigate()
-  const queryClient = useQueryClient()
+const ProductFormPage: React.FC = () => {
+  const rawParams = useParams();
 
   // 解析路由参数
-  const { id } = routeParamsSchema.parse(rawParams)
-  const isEdit = Boolean(id)
+  const { id } = routeParamsSchema.parse(rawParams);
+  const isEdit = Boolean(id);
 
-  // 编辑时拉取详情数据（新建时跳过）
-  const { data: detail, isLoading: isDetailLoading } = useQuery({
-    queryKey: ['resource', 'detail', id],
-    queryFn: () => fetchResourceDetail(id!),
-    enabled: isEdit,
-    staleTime: 60 * 1000,
-  })
+  // 使用 useQuery 编辑时拉取详情数据
+  const {
+    data: detail,
+    isLoading: isDetailLoading,
+    error,
+  } = useQuery({
+    queryKey: ['product', 'detail', id],
+    queryFn: () => fetchProductDetail(id!),
+    enabled: isEdit && !!id,
+  });
 
-  // 新建 mutation
-  const { mutateAsync: handleCreate, isPending: isCreating } = useMutation({
-    mutationFn: createResource,
-    onSuccess: () => {
-      message.success('创建成功')
-      queryClient.invalidateQueries({ queryKey: ['resource'] })
-      navigate('/resources')
-    },
-    onError: (err: Error) => {
-      message.error(err.message || '创建失败')
-    },
-  })
+  // 错误提示
+  React.useEffect(() => {
+    if (error) {
+      message.error((error as Error).message || '加载失败');
+    }
+  }, [error]);
 
-  // 编辑 mutation
-  const { mutateAsync: handleUpdate, isPending: isUpdating } = useMutation({
-    mutationFn: (data: ResourceFormValues) => updateResource(id!, data),
-    onSuccess: () => {
-      message.success('更新成功')
-      queryClient.invalidateQueries({ queryKey: ['resource'] })
-      navigate('/resources')
-    },
-    onError: (err: Error) => {
-      message.error(err.message || '更新失败')
-    },
-  })
+  const [isSubmitting, setIsSubmitting] = React.useState(false);
 
-  const isSubmitting = isCreating || isUpdating
-
-  // 表单提交（使用 zod 做最终校验）
-  const handleFinish = async (values: Record<string, unknown>) => {
-    const parseResult = resourceFormSchema.safeParse(values)
+  // 表单提交
+  const handleFinish = async (values: Record<string, any>) => {
+    const parseResult = productFormSchema.safeParse(values);
     if (!parseResult.success) {
-      message.error('表单数据校验失败，请检查输入')
-      console.error(parseResult.error.flatten())
-      return false
+      message.error('表单数据校验失败，请检查输入');
+      console.error(parseResult.error.flatten());
+      return false;
     }
-    if (isEdit) {
-      await handleUpdate(parseResult.data)
-    } else {
-      await handleCreate(parseResult.data)
+
+    setIsSubmitting(true);
+    try {
+      if (isEdit && id) {
+        await updateProduct(id, parseResult.data);
+        message.success('更新成功');
+      } else {
+        await createProduct(parseResult.data);
+        message.success('创建成功');
+      }
+      history.back();
+      return true;
+    } catch (error: any) {
+      message.error(error.message || '操作失败');
+      return false;
+    } finally {
+      setIsSubmitting(false);
     }
-    return true
-  }
+  };
 
   if (isEdit && isDetailLoading) {
     return (
-      <PageContainer title={isEdit ? '编辑资源' : '新建资源'}>
+      <PageContainer title={isEdit ? '编辑产品' : '新建产品'}>
         <Spin size="large" style={{ display: 'flex', justifyContent: 'center', padding: 80 }} />
       </PageContainer>
-    )
+    );
   }
 
   return (
     <PageContainer
-      title={isEdit ? '编辑资源' : '新建资源'}
+      title={isEdit ? '编辑产品' : '新建产品'}
       breadcrumb={{
         items: [
           { title: '首页', path: '/' },
-          { title: '资源管理', path: '/resources' },
+          { title: '产品管理', path: '/products' },
           { title: isEdit ? '编辑' : '新建' },
         ],
       }}
@@ -202,31 +197,45 @@ const ResourceFormPage: React.FC = () => {
       <FormCard bordered={false}>
         <ProForm
           layout="vertical"
-          // 编辑时回填初始值
           initialValues={
             isEdit && detail
               ? {
-                  ...detail,
-                  // 日期范围字段需要特殊处理
-                  dateRange:
-                    detail.startDate && detail.endDate
-                      ? [detail.startDate, detail.endDate]
-                      : undefined,
+                  name: detail.name,
+                  description: detail.description,
+                  price: detail.price,
+                  originalPrice: detail.originalPrice,
+                  stock: detail.stock,
+                  category: detail.category,
+                  brand: detail.brand,
+                  status: detail.status,
+                  imageUrl: detail.imageUrl,
+                  tags: detail.tags,
                 }
-              : { status: 'active', tags: [] }
+              : {
+                  status: 'on_sale',
+                  tags: [],
+                  stock: 0,
+                }
           }
           onFinish={handleFinish}
-          submitter={false} // 禁用默认提交按钮，使用自定义 FooterBar
+          submitter={false}
         >
-          {/* 基本信息分组 */}
+          {/* 基本信息 */}
           <ProForm.Group title="基本信息">
             <ProFormText
               name="name"
-              label="名称"
-              placeholder="请输入名称"
-              rules={[{ required: true, message: '名称不能为空' }]}
-              fieldProps={{ maxLength: 50, showCount: true }}
-              width="lg"
+              label="产品名称"
+              placeholder="请输入产品名称"
+              rules={[{ required: true, message: '产品名称不能为空' }]}
+              fieldProps={{ maxLength: 100, showCount: true }}
+              width="xl"
+            />
+            <ProFormText
+              name="brand"
+              label="品牌"
+              placeholder="请输入品牌"
+              rules={[{ required: true, message: '品牌不能为空' }]}
+              width="md"
             />
             <ProFormSelect
               name="category"
@@ -234,53 +243,77 @@ const ResourceFormPage: React.FC = () => {
               placeholder="请选择分类"
               rules={[{ required: true, message: '请选择分类' }]}
               options={[
-                { label: '分类A', value: 'a' },
-                { label: '分类B', value: 'b' },
-                { label: '分类C', value: 'c' },
+                { label: '电子产品', value: 'electronics' },
+                { label: '服装', value: 'clothing' },
+                { label: '食品', value: 'food' },
+                { label: '图书', value: 'books' },
+                { label: '运动', value: 'sports' },
               ]}
               width="md"
             />
           </ProForm.Group>
 
-          <ProForm.Group title="详细配置">
+          {/* 详细信息 */}
+          <ProForm.Group title="详细信息">
             <ProFormTextArea
               name="description"
-              label="描述"
-              placeholder="请输入描述（选填）"
-              fieldProps={{ maxLength: 500, showCount: true, rows: 4 }}
+              label="产品描述"
+              placeholder="请输入产品描述（选填）"
+              fieldProps={{ maxLength: 1000, showCount: true, rows: 4 }}
               width="xl"
             />
-            <ProFormSelect
-              name="status"
-              label="状态"
-              options={[
-                { label: '启用', value: 'active' },
-                { label: '停用', value: 'inactive' },
-              ]}
-              width="sm"
+            <ProFormText
+              name="imageUrl"
+              label="产品图片URL"
+              placeholder="请输入图片URL（选填）"
+              width="xl"
             />
           </ProForm.Group>
 
-          <ProForm.Group title="其他信息">
-            <ProFormDateRangePicker
-              name="dateRange"
-              label="有效期"
-              fieldProps={{
-                format: 'YYYY-MM-DD',
-              }}
+          {/* 价格与库存 */}
+          <ProForm.Group title="价格与库存">
+            <ProFormDigit
+              name="price"
+              label="售价"
+              placeholder="请输入售价"
+              rules={[{ required: true, message: '售价不能为空' }]}
+              min={0.01}
+              fieldProps={{ precision: 2, prefix: '¥' }}
+              width="md"
             />
             <ProFormDigit
-              name="amount"
-              label="金额"
-              placeholder="请输入金额"
+              name="originalPrice"
+              label="原价"
+              placeholder="请输入原价（选填）"
               min={0}
               fieldProps={{ precision: 2, prefix: '¥' }}
               width="md"
             />
+            <ProFormDigit
+              name="stock"
+              label="库存"
+              placeholder="请输入库存"
+              rules={[{ required: true, message: '库存不能为空' }]}
+              min={0}
+              fieldProps={{ precision: 0 }}
+              width="md"
+            />
+          </ProForm.Group>
+
+          {/* 状态 */}
+          <ProForm.Group title="产品状态">
+            <ProFormRadio.Group
+              name="status"
+              label="销售状态"
+              options={[
+                { label: '在售', value: 'on_sale' },
+                { label: '下架', value: 'off_sale' },
+              ]}
+            />
           </ProForm.Group>
 
           <FooterBar>
-            <Button onClick={() => navigate(-1)}>取消</Button>
+            <Button onClick={() => history.back()}>取消</Button>
             <Button type="primary" htmlType="submit" loading={isSubmitting}>
               {isEdit ? '保存修改' : '立即创建'}
             </Button>
@@ -288,10 +321,10 @@ const ResourceFormPage: React.FC = () => {
         </ProForm>
       </FormCard>
     </PageContainer>
-  )
-}
+  );
+};
 
-export default ResourceFormPage
+export default ProductFormPage;
 ```
 
 ---
@@ -308,7 +341,7 @@ export default ResourceFormPage
 | `ProFormDateRangePicker` | 日期范围 | `fieldProps.format` |
 | `ProFormSwitch` | 开关 | - |
 | `ProFormCheckbox` | 复选框 | `options` |
-| `ProFormRadio` | 单选 | `options` |
+| `ProFormRadio.Group` | 单选 | `options` |
 | `ProFormUploadButton` | 文件上传 | `action`, `max` |
 
 ## 表单宽度规范
@@ -324,6 +357,14 @@ width="xl"  // 552px
 ## 新建/编辑复用策略
 
 - 通过路由参数 `id` 是否存在区分新建/编辑
-- 编辑时用 `useQuery` 获取详情，设置 `enabled: isEdit`
-- `initialValues` 根据 `isEdit` 动态设置
-- 提交时调用不同 mutation（createXxx / updateXxx）
+- 编辑时用 `useQuery` 获取详情，设置 `enabled: isEdit && !!id`
+- `initialValues` 根据 `isEdit` 和 `detail` 动态设置
+- 提交时调用不同 API（createXxx / updateXxx）
+
+## 最佳实践
+
+1. **使用 useQuery** - 自动管理加载状态和错误处理
+2. **Zod 校验** - 在 `onFinish` 中使用 `safeParse` 进行最终校验
+3. **加载状态** - 编辑模式加载数据时显示 Spin
+4. **错误反馈** - useEffect 监听 error 并显示提示
+5. **自定义提交按钮** - 使用 `submitter={false}` 并自定义 FooterBar

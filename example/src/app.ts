@@ -14,3 +14,21 @@ export const layout = () => {
     },
   };
 };
+
+export const reactQuery = {
+  devtool: {
+    initialIsOpen: false,
+  },
+  queryClient: {
+    defaultOptions: {
+      queries: {
+        retry: false,
+        refetchOnWindowFocus: false,
+        networkMode: 'always',
+      },
+      mutations: {
+        networkMode: 'always',
+      },
+    },
+  },
+};

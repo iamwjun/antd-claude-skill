@@ -16,9 +16,10 @@
   "scripts": {
     "build": "rollup -c",
     "build:cli": "tsc bin/cli.ts --outDir bin --module commonjs --target es2015 --esModuleInterop",
-    "dev": "rollup -c -w",
+    "dev:example": "cd example && max dev",
     "test": "jest",
     "lint": "eslint src --ext .ts,.tsx",
+    "format": "prettier --cache --write .",
     "prepublishOnly": "npm run build"
   },
   "keywords": [
@@ -48,15 +49,24 @@
     "@rollup/plugin-node-resolve": "^15.0.0",
     "@rollup/plugin-typescript": "^11.0.0",
     "@types/node": "^20.0.0",
-    "@types/react": "^18.0.0",
-    "@types/react-dom": "^18.0.0",
+    "@types/react": "^18.0.33",
+    "@types/react-dom": "^18.0.11",
     "@typescript-eslint/eslint-plugin": "^6.0.0",
     "@typescript-eslint/parser": "^6.0.0",
+    "@ant-design/icons": "^5.0.1",
+    "@ant-design/pro-components": "^2.4.4",
+    "@umijs/max": "^4.6.38",
+    "antd": "^5.4.0",
     "eslint": "^8.0.0",
     "eslint-plugin-react": "^7.33.0",
+    "husky": "^9",
+    "lint-staged": "^13.2.0",
+    "prettier": "^2.8.7",
+    "prettier-plugin-organize-imports": "^3.2.2",
+    "prettier-plugin-packagejson": "^2.4.3",
     "rollup": "^4.0.0",
     "tslib": "^2.6.0",
-    "typescript": "^5.0.0"
+    "typescript": "^5.0.3"
   },
   "dependencies": {
     "chalk": "^4.1.2",

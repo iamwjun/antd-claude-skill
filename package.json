@@ -1,6 +1,6 @@
 {
   "name": "antd-claude-skill",
-  "version": "0.1.7",
+  "version": "0.1.8",
   "description": "An Ant Design Claude skill package",
   "main": "dist/index.js",
   "module": "dist/index.esm.js",
